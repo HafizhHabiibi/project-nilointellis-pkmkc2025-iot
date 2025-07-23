@@ -1,2 +1,30 @@
+# Virtual environments
 venv/
 env/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# VSCode settings (opsional)
+.vscode/
+
+# MacOS / Windows / Linux junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database file (kalau pakai SQLite lokal)
+*.sqlite3
+*.db
+
+# Python egg info
+*.egg-info/
