@@ -4,6 +4,7 @@
 #include <ArduinoJson.h> 
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <GravityTDS.h>
 
 // ===== KONFIGURASI WIFI & API =====
 const char* ssid = "Bharata";             
@@ -13,15 +14,20 @@ const char* API_SENSOR_URL = "http://192.168.18.4:5000/sensor";
 // ===== KONFIGURASI PIN =====
 const int pinOneWire = 4;  // Pin data sensor DS18B20
 const int pinpH = 34; // Pin data sensor pH
+const int pintds = 35; // Pin data sensor TDS
 
 // ===== OBJEK SENSOR =====
 OneWire oneWire(pinOneWire);
 DallasTemperature sensors(&oneWire);
+GravityTDS gravityTds;
 
 // ===== TIMER =====
 unsigned long lastSuhuCheck = 0;
 unsigned long lastpHCheck = 0;
+unsigned long lastTdsCheck = 0;
 float currentpH = 0.0;
+float currentTDS = 0.0;
+float suhu = 0.0;
 
 // ===== FUNGSI =====
 
@@ -61,7 +67,7 @@ void cekWifi() {
 }
 
 // 3. Fungsi kirim data ke API
-void kirimData(float suhu, float ph) {
+void kirimData(float suhu, float ph, float tds) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(API_SENSOR_URL);
@@ -70,6 +76,7 @@ void kirimData(float suhu, float ph) {
     StaticJsonDocument<200> doc;
     doc["suhu"] = suhu;
     doc["ph"] = ph;
+    doc["tds"] = tds;
 
     String body;
     serializeJson(doc, body);
@@ -93,12 +100,22 @@ float topH(float voltage) {
   return m * voltage + b;
 }
 
+// 6. Fungsi baca TDS
+float bacaTDS(float suhu) {
+  gravityTds.setTemperature(suhu);  // Kompensasi suhu
+  gravityTds.update();              // Perbarui data TDS
+  return gravityTds.getTdsValue();  // Ambil nilai TDS
+}
+
 // ===== SETUP =====
 void setup() {
   Serial.begin(115200);
 
   konekWifi();        // menyambungkan ke WIFI
   sensors.begin();    // mulai sensor suhu DS18B20
+  gravityTds.setPin(pintds);       // Set pin sensor TDS
+  gravityTds.setAref(3.3);         // Tegangan referensi
+  gravityTds.begin();              // Inisialisasi sensor
 }
 
 // ===== LOOP =====
@@ -117,13 +134,19 @@ void loop() {
     lastpHCheck = now;
   }
 
-  // Baca suhu setiap 5 detik
+// Baca suhu + TDS + kirim setiap 5 detik
   if (now - lastSuhuCheck > 5000) {
-    float suhu = bacaSuhu();
+    suhu = bacaSuhu();
     Serial.println("Suhu: " + String(suhu) + " °C");
 
+    currentTDS = bacaTDS(suhu);
+    Serial.print("TDS: ");
+    Serial.print(currentTDS, 0);
+    Serial.println(" ppm");
+
+    kirimData(suhu, currentpH, currentTDS);
+
     lastSuhuCheck = now;
-    kirimData(suhu, currentpH);  // Kirim ke server
   }
 
   delay(1000);  
