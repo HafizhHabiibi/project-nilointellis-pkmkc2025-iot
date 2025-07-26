@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.json_util import dumps
+import pytz
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +21,13 @@ collection = db["sensor"]
 
 # Global variable untuk data terakhir
 data_terakhir = {}
+
+# fungsi konversi WIB
+def konversi_wib(dt_utc):
+    if not isinstance(dt_utc, datetime):
+        return dt_utc
+    wib = pytz.timezone("Asia/Jakarta")
+    return dt_utc.astimezone(wib).strftime('%Y-%m-%d %H:%M:%S')
 
 # Endpoint utama
 @api.route('/')
@@ -47,6 +55,8 @@ def simpan_data():
 def ambil_data():
     hasil_data = data_terakhir.copy()
     hasil_data.pop('_id', None)  # Hapus _id jika ada
+    if 'timestamp' in hasil_data:
+        hasil_data['timestamp'] = konversi_wib(hasil_data['timestamp'])
     return jsonify(hasil_data), 200
 
 # GET riwayat data sensor
@@ -68,5 +78,7 @@ def ambil_riwayat_data():
 
     for item in data:
         item.pop('_id', None)
+        if 'timestamp' in item:
+            item['timestamp'] = konversi_wib(item['timestamp'])
 
     return Response(dumps(data), mimetype='application/json')
