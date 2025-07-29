@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.json_util import dumps
+from .utils import send_notif
 import pytz
 
 # Load environment variables
@@ -50,6 +51,33 @@ def simpan_data():
     collection.insert_one(data_terakhir)
 
     print("✅ Data berhasil disimpan:", data_terakhir)
+
+    warn = []
+
+    ph_min, ph_max = 5.0, 7.0
+    temp_max = 30.0
+    tds_max = 600
+    turbidity_max = 100
+
+    suhu = data.get('suhu')
+    ph = data.get('ph')
+    tds = data.get('tds')
+    turbidity = data.get('turbidity')
+
+    if suhu is not None and suhu > temp_max:
+        warn.append(f"Suhu Tinggi: {suhu}°C")
+    if ph is not None and (ph < ph_min or ph > ph_max):
+        warn.append(f"PH Tidak Normal: {ph}")
+    if tds is not None and tds > tds_max:
+        warn.append(f"TDS Terlalu Tinggi: {tds}PPM")
+    if turbidity is not None and turbidity > turbidity_max:
+        warn.append(f"Kekeruhan Air Tinggi: {turbidity}NTU")
+
+    if warn:
+        pesan = "🚨 Peringatan Kondisi Kolam Nila:\n" + "\n".join(warn)
+        send_notif(pesan)
+
+
     return jsonify({"message": "Data berhasil disimpan"}), 201
 
 # GET data sensor terakhir
