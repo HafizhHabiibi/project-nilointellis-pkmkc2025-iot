@@ -28,3 +28,6 @@ Thumbs.db
 
 # Python egg info
 *.egg-info/
+
+# data berisi chat_id telegram
+chat_id.json
