@@ -6,6 +6,7 @@ colorama==0.4.6
 dnspython==1.16.0
 Flask==3.1.1
 Flask-PyMongo==3.0.1
+git-filter-repo==2.47.0
 idna==3.10
 itsdangerous==2.2.0
 Jinja2==3.1.6
