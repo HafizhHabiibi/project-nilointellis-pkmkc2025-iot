@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.json_util import dumps
-from .utils import send_notif
+from .utils import send_notif, sokap
 import pytz
 
 # Load environment variables
@@ -37,6 +37,17 @@ def konversi_wib(dt_utc):
 def home():
     return "✅ API IoT Aktif"
 
+# Endpoint webhook telegram bot
+@api.route("/telegram", methods=['POST'])
+def webhook():
+    data = request.get_json()
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
+        if text == "/start":
+            sokap(chat_id)
+    return jsonify({"ok": True})
+
 # POST data sensor
 @api.route('/sensor', methods=['POST'])
 def simpan_data():
@@ -54,29 +65,48 @@ def simpan_data():
 
     warn = []
 
-    ph_min, ph_max = 5.0, 7.0
-    temp_max = 30.0
-    tds_max = 600
-    turbidity_max = 100
+    ph_min, ph_max = 6.5, 8.5
+    temp_min, temp_max = 25.0, 32.0
+    tds_min, tds_max = 250, 800
+    turbidity_min, turbidity_max = 20, 50
 
     suhu = data.get('suhu')
     ph = data.get('ph')
     tds = data.get('tds')
     turbidity = data.get('turbidity')
 
-    if suhu is not None and suhu > temp_max:
-        warn.append(f"Suhu Tinggi: {suhu}°C")
-    if ph is not None and (ph < ph_min or ph > ph_max):
-        warn.append(f"PH Tidak Normal: {ph}")
-    if tds is not None and tds > tds_max:
-        warn.append(f"TDS Terlalu Tinggi: {tds}PPM")
-    if turbidity is not None and turbidity > turbidity_max:
-        warn.append(f"Kekeruhan Air Tinggi: {turbidity}NTU")
+    # suhu
+    if suhu is not None:
+        if suhu < temp_min:
+            warn.append(f"Suhu kolam terlalu rendah : {suhu} °C")
+        elif suhu > temp_max:
+            warn.append(f"Suhu kolam terlalu tinggi : {suhu} °C")
+
+    # ph
+    if ph is not None:
+        if ph < ph_min:
+            warn.append(f"pH kolam terlalu rendah : {ph}")
+        elif ph > ph_max:
+            warn.append(f"pH kolam terlalu tinggi : {ph}")
+
+    # tds
+    if ph is not None:
+        if tds < tds_min:
+            warn.append(f"TDS kolam terlalu rendah : {tds} PPM")
+        elif tds > tds_max:
+            warn.append(f"TDS kolam terlalu tinggi : {tds} PPM")
+
+    # turbidity
+    if turbidity is not None:
+        if turbidity < turbidity_min:
+            warn.append(f"Turbidity kolam terlalu rendah : {turbidity} NTU")
+        elif turbidity > turbidity_max:
+            warn.append(f"Turbidity kolam terlalu tinggi : {turbidity} NTU")
 
     if warn:
-        pesan = "🚨 Peringatan Kondisi Kolam Nila:\n" + "\n".join(warn)
+        pesan = ("*🐟 NiloIntellis: Ada yang Perlu Diperhatikan!*\n\n" + "\n".join(warn) 
+                + "\n\n*Segera periksa kondisi kolam!*")
         send_notif(pesan)
-
 
     return jsonify({"message": "Data berhasil disimpan"}), 201
 
