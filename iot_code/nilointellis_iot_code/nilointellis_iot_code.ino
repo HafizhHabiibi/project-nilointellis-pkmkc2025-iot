@@ -7,14 +7,15 @@
 #include <GravityTDS.h>
 
 // ===== KONFIGURASI WIFI & API =====
-const char* ssid = "Bharata";             
-const char* password = "orangerti";     
-const char* API_SENSOR_URL = "http://192.168.18.4:5000/sensor";  
+const char* ssid = "UTY-Connect";             
+const char* password = "";     
+const char* API_SENSOR_URL = "http://192.168.40.181:5000/sensor";  
 
 // ===== KONFIGURASI PIN =====
 const int pinOneWire = 4;  // Pin data sensor DS18B20
 const int pinpH = 34; // Pin data sensor pH
 const int pintds = 35; // Pin data sensor TDS
+const int pintur = 32; // Pin data sensor turbiity
 
 // ===== OBJEK SENSOR =====
 OneWire oneWire(pinOneWire);
@@ -25,8 +26,10 @@ GravityTDS gravityTds;
 unsigned long lastSuhuCheck = 0;
 unsigned long lastpHCheck = 0;
 unsigned long lastTdsCheck = 0;
+unsigned long lastTurCheck = 0;
 float currentpH = 0.0;
 float currentTDS = 0.0;
+float currentTur = 0.0;
 float suhu = 0.0;
 
 // ===== FUNGSI =====
@@ -67,7 +70,7 @@ void cekWifi() {
 }
 
 // 3. Fungsi kirim data ke API
-void kirimData(float suhu, float ph, float tds) {
+void kirimData(float suhu, float ph, float tds, float turbidity) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(API_SENSOR_URL);
@@ -77,7 +80,8 @@ void kirimData(float suhu, float ph, float tds) {
     doc["suhu"] = suhu;
     doc["ph"] = ph;
     doc["tds"] = tds;
-
+    doc["turbidity"] = turbidity;
+ 
     String body;
     serializeJson(doc, body);
     int httpResponseCode = http.POST(body);
@@ -107,6 +111,15 @@ float bacaTDS(float suhu) {
   return gravityTds.getTdsValue();  // Ambil nilai TDS
 }
 
+// 7. Fungsi konversi nilai NTU
+float toNTU(float voltage) {
+  float m = -917.43;
+  float b = 2370.69;
+  float ntu = m * voltage + b;
+  if (ntu < 0) ntu = 0;
+  return ntu;
+}
+
 // ===== SETUP =====
 void setup() {
   Serial.begin(115200);
@@ -124,17 +137,30 @@ void loop() {
 
   unsigned long now = millis();
 
-  // Baca pH setiap 5 detik
+  // Baca pH setiap 1 menit
   if (now - lastpHCheck > 5000) {
     int rawpH = analogRead(pinpH);
     float voltagepH = rawpH * (3.3 / 4095.0);
     currentpH = topH(voltagepH);
     Serial.print("pH: ");
     Serial.println(currentpH, 2);
+
     lastpHCheck = now;
   }
 
-// Baca suhu + TDS + kirim setiap 5 detik
+// Baca NTU setiap 1 menit
+  if (now - lastTurCheck > 5000) {
+    int rawNTU = analogRead(pintur);
+    float voltageNTU = rawNTU * (3.3 / 4095.0);
+    currentTur = toNTU(voltageNTU);
+
+    Serial.print("NTU: ");
+    Serial.println(currentTur, 2);
+
+    lastTurCheck = now;
+  }
+
+// Baca suhu + TDS + kirim setiap 1 menit
   if (now - lastSuhuCheck > 5000) {
     suhu = bacaSuhu();
     Serial.println("Suhu: " + String(suhu) + " °C");
@@ -144,7 +170,7 @@ void loop() {
     Serial.print(currentTDS, 0);
     Serial.println(" ppm");
 
-    kirimData(suhu, currentpH, currentTDS);
+    kirimData(suhu, currentpH, currentTDS, currentTur);
 
     lastSuhuCheck = now;
   }
