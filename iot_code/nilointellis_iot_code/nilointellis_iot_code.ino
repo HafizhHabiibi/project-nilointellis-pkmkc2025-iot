@@ -7,9 +7,9 @@
 #include <GravityTDS.h>
 
 // ===== KONFIGURASI WIFI & API =====
-const char* ssid = "UTY-Connect";             
-const char* password = "";     
-const char* API_SENSOR_URL = "http://192.168.40.181:5000/sensor";  
+const char* ssid = "Bharata";             
+const char* password = "orangerti";     
+const char* API_SENSOR_URL = "https://project-nilointellis-pkmkc2025-api-production.up.railway.app/sensor";  
 
 // ===== KONFIGURASI PIN =====
 const int pinOneWire = 4;  // Pin data sensor DS18B20
@@ -23,10 +23,11 @@ DallasTemperature sensors(&oneWire);
 GravityTDS gravityTds;
 
 // ===== TIMER =====
-unsigned long lastSuhuCheck = 0;
+unsigned long lastSuhuTDSCheck = 0;
 unsigned long lastpHCheck = 0;
-unsigned long lastTdsCheck = 0;
+// unsigned long lastTdsCheck = 0;
 unsigned long lastTurCheck = 0;
+unsigned long lastKirimCheck = 0;
 float currentpH = 0.0;
 float currentTDS = 0.0;
 float currentTur = 0.0;
@@ -86,7 +87,15 @@ void kirimData(float suhu, float ph, float tds, float turbidity) {
     serializeJson(doc, body);
     int httpResponseCode = http.POST(body);
 
-    Serial.println("Kirim data ke API, Response: " + String(httpResponseCode));
+    if (httpResponseCode > 0) {
+      String payload = http.getString();
+      Serial.println("Response code: "+ String(httpResponseCode));
+      Serial.println("Response body: "+ payload);
+    }
+
+    else {
+      Serial.println("[ERROR] saat mengirim data, code: "+ String(httpResponseCode));
+    }
     http.end();
   }
 }
@@ -138,7 +147,7 @@ void loop() {
   unsigned long now = millis();
 
   // Baca pH setiap 1 menit
-  if (now - lastpHCheck > 5000) {
+  if (now - lastpHCheck > 60000) {
     int rawpH = analogRead(pinpH);
     float voltagepH = rawpH * (3.3 / 4095.0);
     currentpH = topH(voltagepH);
@@ -149,7 +158,7 @@ void loop() {
   }
 
 // Baca NTU setiap 1 menit
-  if (now - lastTurCheck > 5000) {
+  if (now - lastTurCheck > 60000) {
     int rawNTU = analogRead(pintur);
     float voltageNTU = rawNTU * (3.3 / 4095.0);
     currentTur = toNTU(voltageNTU);
@@ -161,7 +170,7 @@ void loop() {
   }
 
 // Baca suhu + TDS + kirim setiap 1 menit
-  if (now - lastSuhuCheck > 5000) {
+  if (now - lastSuhuTDSCheck > 60000) {
     suhu = bacaSuhu();
     Serial.println("Suhu: " + String(suhu) + " °C");
 
@@ -170,10 +179,15 @@ void loop() {
     Serial.print(currentTDS, 0);
     Serial.println(" ppm");
 
-    kirimData(suhu, currentpH, currentTDS, currentTur);
-
-    lastSuhuCheck = now;
+    lastSuhuTDSCheck = now;
   }
+
+// Kirim Data Sensor Setiap 1 Menit
+if (now - lastKirimCheck > 60000){
+  kirimData(suhu, currentpH, currentTDS, currentTur);
+
+  lastKirimCheck = now;
+}
 
   delay(1000);  
 }
