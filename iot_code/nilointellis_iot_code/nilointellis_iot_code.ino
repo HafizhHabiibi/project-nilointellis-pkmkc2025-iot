@@ -9,13 +9,32 @@
 // ===== KONFIGURASI WIFI & API =====
 const char* ssid = "Bharata";             
 const char* password = "orangerti";     
-const char* API_SENSOR_URL = "https://project-nilointellis-pkmkc2025-api-production.up.railway.app/sensor";  
+const char* API_SENSOR_URL = "http://192.168.18.4:5000/sensor";  
 
 // ===== KONFIGURASI PIN =====
-const int pinOneWire = 4;  // Pin data sensor DS18B20
+const int pinOneWire = 13;  // Pin data sensor DS18B20
 const int pinpH = 34; // Pin data sensor pH
 const int pintds = 35; // Pin data sensor TDS
 const int pintur = 32; // Pin data sensor turbiity
+
+// ===== KONFIGURASI Turbidity =====
+const int samples = 800;
+
+// Voltage Divider
+const float R1 = 3300.0;
+const float R2 = 8200.0;
+const float ratio = R2 / (R1 + R2);
+
+// Referensi tegangan
+const float ADC_MAX = 4095.0;
+float VREF = 3.3;
+
+// correctionFactor perbandingan ADS ESP32 & Multimeter
+float correctionFactor = 1.14;
+
+// Persamaan linear NTU
+const float coef = -1982.9;
+const float intercept = 5151.1;
 
 // ===== OBJEK SENSOR =====
 OneWire oneWire(pinOneWire);
@@ -121,12 +140,28 @@ float bacaTDS(float suhu) {
 }
 
 // 7. Fungsi konversi nilai NTU
-float toNTU(float voltage) {
-  float m = -917.43;
-  float b = 2370.69;
-  float ntu = m * voltage + b;
-  if (ntu < 0) ntu = 0;
-  return ntu;
+float bacaNTU() {
+  long sum = 0;
+  for (int i = 0; i < samples; i++) {
+    sum += analogRead(pintur);
+    delay(1);
+  }
+  int rawADC = sum / samples;
+
+  // Konversi ADC ke Vout
+  float Vout_calc = (rawADC * VREF) / ADC_MAX;
+
+  // Koreksi dengan correctionFactor
+  float Vout_corrected = Vout_calc * correctionFactor;
+
+  // Rekonstruksi Vsensor (sebelum divider)
+  float Vsensor = Vout_corrected / ratio;
+
+  // Hitung NTU
+  float NTU = coef * Vsensor + intercept;
+  if (NTU < 0) NTU = 0;
+
+  return NTU;
 }
 
 // ===== SETUP =====
@@ -159,9 +194,7 @@ void loop() {
 
 // Baca NTU setiap 1 menit
   if (now - lastTurCheck > 60000) {
-    int rawNTU = analogRead(pintur);
-    float voltageNTU = rawNTU * (3.3 / 4095.0);
-    currentTur = toNTU(voltageNTU);
+    currentTur = bacaNTU();
 
     Serial.print("NTU: ");
     Serial.println(currentTur, 2);
