@@ -13,17 +13,12 @@ const char* API_SENSOR_URL = "http://192.168.18.4:5000/sensor";
 
 // ===== KONFIGURASI PIN =====
 const int pinOneWire = 13;  // Pin data sensor DS18B20
-const int pinpH = 34; // Pin data sensor pH
+const int pinpH = 32; // Pin data sensor pH
 const int pintds = 35; // Pin data sensor TDS
-const int pintur = 32; // Pin data sensor turbiity
+const int pintur = 34; // Pin data sensor turbiity
 
 // ===== KONFIGURASI Turbidity =====
 const int samples = 800;
-
-// Voltage Divider
-const float R1 = 3300.0;
-const float R2 = 8200.0;
-const float ratio = R2 / (R1 + R2);
 
 // Referensi tegangan
 const float ADC_MAX = 4095.0;
@@ -148,18 +143,18 @@ float bacaNTU() {
   }
   int rawADC = sum / samples;
 
-  // Konversi ADC ke Vout
+  // Konversi ADC ke tegangan (Vout langsung dari pin ESP32)
   float Vout_calc = (rawADC * VREF) / ADC_MAX;
 
   // Koreksi dengan correctionFactor
   float Vout_corrected = Vout_calc * correctionFactor;
 
-  // Rekonstruksi Vsensor (sebelum divider)
-  float Vsensor = Vout_corrected / ratio;
+  // Hitung NTU langsung (tanpa rekonstruksi divider)
+  float NTU = coef * Vout_corrected + intercept;
 
-  // Hitung NTU
-  float NTU = coef * Vsensor + intercept;
+  // Batasi range hasil
   if (NTU < 0) NTU = 0;
+  if (NTU > 3000) NTU = 3000;
 
   return NTU;
 }
