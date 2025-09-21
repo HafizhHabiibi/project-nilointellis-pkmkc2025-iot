@@ -5,6 +5,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <GravityTDS.h>
+#include "DFRobot_ESP_PH.h"
+#include "EEPROM.h"
 
 // ===== KONFIGURASI WIFI & API =====
 const char* ssid = "Bharata";             
@@ -35,6 +37,7 @@ const float intercept = 5151.1;
 OneWire oneWire(pinOneWire);
 DallasTemperature sensors(&oneWire);
 GravityTDS gravityTds;
+DFRobot_ESP_PH ph;
 
 // ===== TIMER =====
 unsigned long lastSuhuTDSCheck = 0;
@@ -120,21 +123,14 @@ float bacaSuhu() {
   return sensors.getTempCByIndex(0);  
 }
 
-// 5. Fungsi konversi nilai pH
-float topH(float voltage) {
-  float m = (4.0 - 7.0) / (2.947 - 2.315);
-  float b = 7.0 - (m * 2.315);
-  return m * voltage + b;
-}
-
-// 6. Fungsi baca TDS
+// 5. Fungsi baca TDS
 float bacaTDS(float suhu) {
   gravityTds.setTemperature(suhu);  // Kompensasi suhu
   gravityTds.update();              // Perbarui data TDS
   return gravityTds.getTdsValue();  // Ambil nilai TDS
 }
 
-// 7. Fungsi konversi nilai NTU
+// 6. Fungsi konversi nilai NTU
 float bacaNTU() {
   long sum = 0;
   for (int i = 0; i < samples; i++) {
@@ -162,12 +158,15 @@ float bacaNTU() {
 // ===== SETUP =====
 void setup() {
   Serial.begin(115200);
+  EEPROM.begin(32);
 
   konekWifi();        // menyambungkan ke WIFI
   sensors.begin();    // mulai sensor suhu DS18B20
   gravityTds.setPin(pintds);       // Set pin sensor TDS
   gravityTds.setAref(3.3);         // Tegangan referensi
-  gravityTds.begin();              // Inisialisasi sensor
+  gravityTds.begin();              // Inisialisasi TDS
+  ph.begin(); //Inisiasi PH
+  
 }
 
 // ===== LOOP =====
@@ -179,8 +178,8 @@ void loop() {
   // Baca pH setiap 1 menit
   if (now - lastpHCheck > 60000) {
     int rawpH = analogRead(pinpH);
-    float voltagepH = rawpH * (3.3 / 4095.0);
-    currentpH = topH(voltagepH);
+    float voltagepH = rawpH * (3.3 / 4095.0 * 1000);
+    currentpH = ph.readPH(voltagepH, suhu);
     Serial.print("pH: ");
     Serial.println(currentpH, 2);
 
