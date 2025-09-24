@@ -42,13 +42,16 @@ DFRobot_ESP_PH ph;
 // ===== TIMER =====
 unsigned long lastSuhuTDSCheck = 0;
 unsigned long lastpHCheck = 0;
-// unsigned long lastTdsCheck = 0;
 unsigned long lastTurCheck = 0;
 unsigned long lastKirimCheck = 0;
 float currentpH = 0.0;
 float currentTDS = 0.0;
 float currentTur = 0.0;
 float suhu = 0.0;
+
+// ===== RATA RATA TDS, SUHU, PH =====
+float sumPH = 0, sumTDS = 0, sumSuhu = 0;
+int sampleCount = 0;
 
 // ===== FUNGSI =====
 
@@ -176,12 +179,15 @@ void loop() {
   unsigned long now = millis();
 
   // Baca pH setiap 1 menit
-  if (now - lastpHCheck > 60000) {
+  if (now - lastpHCheck > 5000) {
     int rawpH = analogRead(pinpH);
     float voltagepH = rawpH * (3.3 / 4095.0 * 1000);
     currentpH = ph.readPH(voltagepH, suhu);
     Serial.print("pH: ");
     Serial.println(currentpH, 2);
+
+    sumPH += currentpH;
+    sampleCount++;
 
     lastpHCheck = now;
   }
@@ -197,7 +203,7 @@ void loop() {
   }
 
 // Baca suhu + TDS + kirim setiap 1 menit
-  if (now - lastSuhuTDSCheck > 60000) {
+  if (now - lastSuhuTDSCheck > 5000) {
     suhu = bacaSuhu();
     Serial.println("Suhu: " + String(suhu) + " °C");
 
@@ -206,12 +212,25 @@ void loop() {
     Serial.print(currentTDS, 0);
     Serial.println(" ppm");
 
+    sumTDS += currentTDS;
+    sumSuhu += suhu;
+
     lastSuhuTDSCheck = now;
   }
 
 // Kirim Data Sensor Setiap 1 Menit
-if (now - lastKirimCheck > 60000){
-  kirimData(suhu, currentpH, currentTDS, currentTur);
+if (now - lastKirimCheck > 60000 && sampleCount > 0){
+
+
+  float avgPH = sumPH / sampleCount;
+  float avgTDS = sumTDS / sampleCount;
+  float avgSuhu = sumSuhu / sampleCount;
+
+  kirimData(avgSuhu, avgPH, avgTDS, currentTur);
+
+  // Reset Value
+  sumPH = sumTDS = sumSuhu = 0;
+  sampleCount = 0;
 
   lastKirimCheck = now;
 }
