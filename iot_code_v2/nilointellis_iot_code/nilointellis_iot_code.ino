@@ -50,7 +50,7 @@ float currentTur = 0.0;
 float suhu = 0.0;
 
 // ===== RATA RATA TDS, SUHU, PH =====
-float sumPH = 0, sumTDS = 0, sumSuhu = 0;
+float sumPH = 0, sumTDS = 0, sumSuhu, sumTur= 0;
 int sampleCount = 0;
 
 // ===== FUNGSI =====
@@ -193,11 +193,13 @@ void loop() {
   }
 
 // Baca NTU setiap 1 menit
-  if (now - lastTurCheck > 60000) {
+  if (now - lastTurCheck > 5000) {
     currentTur = bacaNTU();
 
     Serial.print("NTU: ");
     Serial.println(currentTur, 2);
+
+    sumTur += currentTur;
 
     lastTurCheck = now;
   }
@@ -225,8 +227,9 @@ if (now - lastKirimCheck > 60000 && sampleCount > 0){
   float avgPH = sumPH / sampleCount;
   float avgTDS = sumTDS / sampleCount;
   float avgSuhu = sumSuhu / sampleCount;
+  float avgTur = sumTur / sampleCount;
 
-  kirimData(avgSuhu, avgPH, avgTDS, currentTur);
+  kirimData(avgSuhu, avgPH, avgTDS, avgTur);
 
   // Reset Value
   sumPH = sumTDS = sumSuhu = 0;
